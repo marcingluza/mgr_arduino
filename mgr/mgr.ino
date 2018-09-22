@@ -25,6 +25,8 @@
 //POWER
 #define VOLTAGE_PIN A8
 int voltage;
+float ampere = 0.1;
+int watts;
 
 //LCD size
 #define TFTWIDTH   240
@@ -100,13 +102,11 @@ void setup() {
 
 void loop() {
   timeClient.update();
-
-  refreshUI();
-  
   int voltageRead = analogRead(VOLTAGE_PIN);
   voltage = voltageRead * (5.0/1023.0) * 50;
-  Serial.print(voltage);
-  Serial.println(" V");
+  ampere = ampere+0.1;
+  watts = ampere*voltage;
+  refreshUI();
   delay(1000);
 
 }
@@ -156,12 +156,21 @@ void LoadUI(){
 }
 
 void refreshUI(){
-  //screen.fillRect(0, 0, TFTWIDTH, 40, LIGHTCYAN);
+
   screen.setTextSize(2);
   screen.setCursor(70, 15);
-  screen.println("                     ");
-  screen.setCursor(70, 15);
+  screen.setTextColor(WHITE, LIGHTCYAN); 
   screen.println(timeClient.getFormattedTime());
+
+
+  screen.setTextSize(4);
+  screen.setTextColor(WHITE, DARKCYAN);
+  screen.setCursor(75, 45);
+  screen.print(watts);
+  screen.setCursor(75, 85);
+  screen.print(voltage);
+  screen.setCursor(75, 125);
+  screen.print(ampere,1);
 }
 String DisplayIpAddress(IPAddress ip)
 {
