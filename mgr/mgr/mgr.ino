@@ -16,8 +16,7 @@
 #define BLUE    0x001F
 #define RED     0xF800
 #define GREEN   0x07E0
-#define LIGHTCYAN    0x6DFE
-#define DARKCYAN    0x25BA
+#define CYAN    0x07FF
 #define MAGENTA 0xF81F
 #define YELLOW  0xFFE0
 #define WHITE   0xFFFF
@@ -95,20 +94,16 @@ void setup() {
   screen.println(timeClient.getFormattedTime());
 
   LoadUI();
+
 }
 
 
 void loop() {
-  timeClient.update();
-
-  refreshUI();
-  
   int voltageRead = analogRead(VOLTAGE_PIN);
   voltage = voltageRead * (5.0/1023.0) * 50;
   Serial.print(voltage);
   Serial.println(" V");
   delay(1000);
-
 }
 
 void LoadingBars(){
@@ -122,46 +117,9 @@ void LoadingBars(){
 }
 
 void LoadUI(){
-   screen.fillScreen(WHITE);
-   screen.fillRect(0, 0, TFTWIDTH, 40, LIGHTCYAN);
-   screen.fillRect(0, 40, TFTWIDTH, 120, DARKCYAN);
-   screen.fillRect(0, 160, TFTWIDTH, 120, LIGHTCYAN);
-   screen.fillRect(0, 280, TFTWIDTH, TFTHEIGHT, DARKCYAN);
-   screen.setTextColor(WHITE); 
-   screen.setTextSize(4);
-   screen.setCursor(180, 45);
-   screen.print(" W ");
-   screen.setCursor(180, 85);
-   screen.print(" V ");
-   screen.setCursor(180, 125);
-   screen.print(" A ");
-   screen.setTextSize(3);
-   screen.setCursor(5, 170);
-   screen.print(" L1 ");
-   screen.setCursor(5, 210);
-   screen.print(" L2 ");
-   screen.setCursor(5, 250);
-   screen.print(" L3 ");
-   screen.setCursor(187, 170);
-   screen.print(" W ");
-   screen.setCursor(187, 210);
-   screen.print(" W ");
-   screen.setCursor(187, 250);
-   screen.print(" W ");
-   screen.setTextSize(2);
-   screen.setCursor(40, 295);
-   screen.println(localIp);
-   screen.setCursor(70, 15);
-   screen.println(timeClient.getFormattedTime());
-}
-
-void refreshUI(){
-  //screen.fillRect(0, 0, TFTWIDTH, 40, LIGHTCYAN);
-  screen.setTextSize(2);
-  screen.setCursor(70, 15);
-  screen.println("                     ");
-  screen.setCursor(70, 15);
-  screen.println(timeClient.getFormattedTime());
+   screen.reset();
+   screen.fillScreen(CYAN);
+   screen.fillRect(0, 0, 50, 50, 0);
 }
 String DisplayIpAddress(IPAddress ip)
 {
