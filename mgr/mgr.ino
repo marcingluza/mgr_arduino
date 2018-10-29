@@ -1,9 +1,12 @@
+#include <EmonLib.h>
 #include <NTPClient.h>                // time libary
 #include <SPFD5408_Adafruit_GFX.h>    // Core graphics library
 #include <SPFD5408_Adafruit_TFTLCD.h> // Hardware-specific library
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
+
+const String devID = "magister2018";
 
 
 #define LCD_CS A3 // Chip Select goes to Analog 3
@@ -24,9 +27,22 @@
 
 //POWER
 #define VOLTAGE_PIN A8
-int voltage;
-float ampere = 0.1;
-int watts;
+#define L1AMPERE_PIN A9
+#define L2AMPERE_PIN A10
+#define L3AMPERE_PIN A11
+int voltage = 0;
+float ampere_L1 = 0.0;
+float ampere_L2 = 0.0;
+float ampere_L3 = 0.0;
+int watt_L1 = 0;
+int watt_L2 = 0;
+int watt_L3 = 0;
+float ampereSum = 0.0;
+int watts = 0;
+
+EnergyMonitor EnergyMonitorL1;
+EnergyMonitor EnergyMonitorL2; 
+EnergyMonitor EnergyMonitorL3;                  
 
 //LCD size
 #define TFTWIDTH   240
@@ -36,8 +52,10 @@ Adafruit_TFTLCD screen(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
 byte mac[] = {0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02};
 EthernetClient client;
+EthernetServer server(9095);
 EthernetUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "0.pl.pool.ntp.org",7200);
+int connectionAttempts = 1;
 
 String localIp;
 
@@ -64,19 +82,43 @@ void setup() {
   screen.setTextColor(WHITE);  
   screen.setTextSize(1);
   LoadingBars();
+
+  EnergyMonitorL1.current(9, 30);
+  EnergyMonitorL2.current(10, 30);
+  EnergyMonitorL3.current(11, 30);  
+
+  screen.setTextColor(WHITE);  
+  screen.setTextSize(2);
+  screen.println("Kalibr. czujnikow");
+  screen.setTextColor(WHITE);  
+  screen.setTextSize(1);
+
+  for(int i = 0; i<8; i++){
+  ampere_L1 = (EnergyMonitorL1.calcIrms(1480)); 
+  ampere_L2 = (EnergyMonitorL2.calcIrms(1480)); 
+  ampere_L3 = (EnergyMonitorL3.calcIrms(1480)); 
+  for(int j=0;j<5; j++){
+    screen.print(".");
+    //delay(50);
+  }
+  }
+  screen.println();
   
   screen.setTextColor(WHITE);  
   screen.setTextSize(2);
   screen.println("Konfiguracja IP");
   screen.setTextColor(WHITE); 
   screen.setTextSize(1);
-  LoadingBars();
-  if (Ethernet.begin(mac) == 0) {
+  LoadingBars(); 
+
+  while (Ethernet.begin(mac) == 0) {
     screen.setTextColor(WHITE);  
-    screen.setTextSize(2);
-    screen.println("Bład konfiguracji DHCP");
-    for(;;)
-      ;
+    screen.setTextSize(1);
+    screen.print("Proba polaczenia: ");
+    screen.println(connectionAttempts);
+    connectionAttempts++;
+    screen.println("Blad konfiguracji DHCP");
+    delay(1000);
   }
   
   screen.setTextColor(WHITE);  
@@ -96,6 +138,14 @@ void setup() {
   screen.setTextSize(2);
   screen.println(timeClient.getFormattedTime());
 
+  screen.setTextColor(WHITE);  
+  screen.setTextSize(2);
+  screen.println("Start WebSerwera");
+  screen.setTextColor(WHITE);  
+  screen.setTextSize(1);
+  LoadingBars();
+  server.begin();
+
   LoadUI();
 }
 
@@ -104,11 +154,98 @@ void loop() {
   timeClient.update();
   int voltageRead = analogRead(VOLTAGE_PIN);
   voltage = voltageRead * (5.0/1023.0) * 50;
-  ampere = ampere+0.1;
-  watts = ampere*voltage;
-  refreshUI();
-  delay(1000);
+  Serial.print(voltage);
+  Serial.println(" [V]");
+  ampere_L1 = (EnergyMonitorL1.calcIrms(1480)); 
+  watt_L1 = ampere_L1 * voltage;
+  ampere_L2 = (EnergyMonitorL2.calcIrms(1480)); 
+  watt_L2 = ampere_L2 * voltage;
+  ampere_L3 = (EnergyMonitorL3.calcIrms(1480)); 
+  watt_L3 = ampere_L3 * voltage;
 
+   EthernetClient ethClient = server.available();
+  if (ethClient) {
+    bool currentLineIsBlank = true;
+    while (ethClient.connected()) {
+      if (ethClient.available()) {
+        char c = ethClient.read();
+        if (c == '\n' && currentLineIsBlank) {
+          ethClient.println("HTTP/1.1 200 OK");
+          ethClient.println("Content-Type: application/json;charset=utf-8");
+          ethClient.println("Connection: close");
+          ethClient.println();
+          ethClient.print("{\"time\":\"" + timeClient.getFormattedTime() + "\",\"deviceid\":\"" + devID +"\",\"values\":{\"voltage\":\"");
+              ethClient.print(voltage);
+              ethClient.print("\",\"l1current\":\"");
+              ethClient.print(ampere_L1);
+              ethClient.print("\",\"l2current\":\"");
+              ethClient.print(ampere_L2);
+              ethClient.print("\",\"l3current\":\"");
+              ethClient.print(ampere_L3);
+              ethClient.print("\"}}");
+          break;
+        }
+        if (c == '\n') {
+          currentLineIsBlank = true;
+        } else if (c != '\r') {
+          currentLineIsBlank = false;
+        }
+      }
+    }
+  }
+    
+    delay(1);
+
+  
+  Serial.print(ampere_L1);
+  Serial.println(" L1 [A]");
+  Serial.print(ampere_L2);
+  Serial.println(" L2 [A]");
+  Serial.print(ampere_L3);
+  Serial.println(" L3 [A]");
+  ampereSum = ampere_L1 + ampere_L2 + ampere_L3;
+  Serial.print(ampereSum);
+  Serial.println(" sum [A]");
+  watts = ampereSum*voltage;
+  refreshUI();
+  //refreshWebServer();
+  delay(300);
+  ethClient.stop();
+}
+
+void refreshWebServer(){
+  EthernetClient ethClient = server.available();
+  if (ethClient) {
+    bool currentLineIsBlank = true;
+    while (ethClient.connected()) {
+      if (ethClient.available()) {
+        char c = ethClient.read();
+        if (c == '\n' && currentLineIsBlank) {
+          ethClient.println("HTTP/1.1 200 OK");
+          ethClient.println("Content-Type: application/json;charset=utf-8");
+          ethClient.println("Connection: close");
+          ethClient.println();
+          ethClient.print("{\"time\":\"" + timeClient.getFormattedTime() + "\",\"deviceid\":\"" + devID +"\",\"values\":{\"voltage\":\"");
+              ethClient.print(voltage);
+              ethClient.print("\",\"l1current\":\"");
+              ethClient.print(ampere_L1);
+              ethClient.print("\",\"l2current\":\"");
+              ethClient.print(ampere_L2);
+              ethClient.print("\",\"l3current\":\"");
+              ethClient.print(ampere_L3);
+              ethClient.print("\"}}");
+          break;
+        }
+        if (c == '\n') {
+          currentLineIsBlank = true;
+        } else if (c != '\r') {
+          currentLineIsBlank = false;
+        }
+      }
+    }
+    delay(1);
+    ethClient.stop();
+}
 }
 
 void LoadingBars(){
@@ -162,15 +299,28 @@ void refreshUI(){
   screen.setTextColor(WHITE, LIGHTCYAN); 
   screen.println(timeClient.getFormattedTime());
 
-
   screen.setTextSize(4);
   screen.setTextColor(WHITE, DARKCYAN);
-  screen.setCursor(75, 45);
+  screen.setCursor(50, 45);
   screen.print(watts);
-  screen.setCursor(75, 85);
+  screen.print(" ");
+  screen.setCursor(50, 85);
   screen.print(voltage);
-  screen.setCursor(75, 125);
-  screen.print(ampere,1);
+  screen.print(" ");
+  screen.setCursor(50, 125);
+  screen.print(ampereSum,1);
+  screen.print(" ");
+  screen.setTextSize(3);
+  screen.setTextColor(WHITE, LIGHTCYAN);
+  screen.setCursor(80, 170);
+  screen.print(watt_L1);
+  screen.print(" ");
+  screen.setCursor(80, 210);
+  screen.print(watt_L2);
+  screen.print(" ");
+  screen.setCursor(80, 250);
+  screen.print(watt_L3);
+  screen.print(" ");
 }
 String DisplayIpAddress(IPAddress ip)
 {
