@@ -5,6 +5,7 @@
 #include <SPI.h>
 #include <Ethernet.h>
 #include <EthernetUdp.h>
+#include <HttpClient.h>
 
 const String devID = "magister2018";
 
@@ -45,6 +46,9 @@ EnergyMonitor EnergyMonitorL3;
 
 Adafruit_TFTLCD screen(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
+byte myserver[] = { 192, 168, 1, 211 };
+String host = "192.168.1.211";
+int serverPort = 64996;
 byte mac[] = {0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02};
 EthernetClient client;
 EthernetServer server(9095);
@@ -52,10 +56,11 @@ EthernetUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "0.pl.pool.ntp.org", 7200);
 int connectionAttempts = 1;
 
+
 String localIp;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   screen.reset();
   screen.begin(0x9341); // SDFP5408
@@ -144,6 +149,16 @@ void setup() {
   LoadUI();
 }
 
+void LoadingBars() {
+  screen.setTextColor(WHITE);
+  screen.setTextSize(1);
+  for (int i = 0; i < 40; i++) {
+    screen.print(".");
+    //delay(100);
+  }
+  screen.println();
+}
+
 
 void loop() {
   timeClient.update();
@@ -159,40 +174,40 @@ void loop() {
   watt_L3 = ampere_L3 * voltage;
 
 
-//  //////////////////////////////API//////////////////////////////////////
-//  EthernetClient ethClient = server.available();
-//  if (ethClient) {
-//    bool currentLineIsBlank = true;
-//    while (ethClient.connected()) {
-//      if (ethClient.available()) {
-//        char c = ethClient.read();
-//        if (c == '\n' && currentLineIsBlank) {
-//          ethClient.println("HTTP/1.1 200 OK");
-//          ethClient.println("Content-Type: application/json;charset=utf-8");
-//          ethClient.println("Connection: close");
-//          ethClient.println();
-//          ethClient.print("{\"time\":\"" + timeClient.getFormattedTime() + "\",\"deviceid\":\"" + devID + "\",\"values\":{\"voltage\":\"");
-//          ethClient.print(voltage);
-//          ethClient.print("\",\"l1current\":\"");
-//          ethClient.print(ampere_L1);
-//          ethClient.print("\",\"l2current\":\"");
-//          ethClient.print(ampere_L2);
-//          ethClient.print("\",\"l3current\":\"");
-//          ethClient.print(ampere_L3);
-//          ethClient.print("\"}}");
-//          break;
-//        }
-//        if (c == '\n') {
-//          currentLineIsBlank = true;
-//        } else if (c != '\r') {
-//          currentLineIsBlank = false;
-//        }
-//      }
-//    }
-//  }
-//
-//  //delay(1000);
-//  //////////////////////////////////////////////////////////////////////////
+  //  //////////////////////////////API//////////////////////////////////////
+  //  EthernetClient ethClient = server.available();
+  //  if (ethClient) {
+  //    bool currentLineIsBlank = true;
+  //    while (ethClient.connected()) {
+  //      if (ethClient.available()) {
+  //        char c = ethClient.read();
+  //        if (c == '\n' && currentLineIsBlank) {
+  //          ethClient.println("HTTP/1.1 200 OK");
+  //          ethClient.println("Content-Type: application/json;charset=utf-8");
+  //          ethClient.println("Connection: close");
+  //          ethClient.println();
+  //          ethClient.print("{\"time\":\"" + timeClient.getFormattedTime() + "\",\"deviceid\":\"" + devID + "\",\"values\":{\"voltage\":\"");
+  //          ethClient.print(voltage);
+  //          ethClient.print("\",\"l1current\":\"");
+  //          ethClient.print(ampere_L1);
+  //          ethClient.print("\",\"l2current\":\"");
+  //          ethClient.print(ampere_L2);
+  //          ethClient.print("\",\"l3current\":\"");
+  //          ethClient.print(ampere_L3);
+  //          ethClient.print("\"}}");
+  //          break;
+  //        }
+  //        if (c == '\n') {
+  //          currentLineIsBlank = true;
+  //        } else if (c != '\r') {
+  //          currentLineIsBlank = false;
+  //        }
+  //      }
+  //    }
+  //  }
+  //
+  //  //delay(1000);
+  //  //////////////////////////////////////////////////////////////////////////
 
   Serial.print(ampere_L1);
   Serial.println(" L1 [A]");
@@ -206,9 +221,41 @@ void loop() {
   watts = ampereSum * voltage;
   refreshUI();
   refreshWebServer();
-  //delay(300);
-//  ethClient.stop();
+  post();
+  delay(300);
+
 }
+
+void post()
+{
+  String PostString = "/Arduino/Add?id=" + devID + "&voltage=" + voltage + "&l1_current=" + ampere_L1 + "&l1_current=" + ampere_L1 + "&l1_current=" + ampere_L1;
+   if (client.connect(myserver, 80)) {  
+    Serial.println("connected");
+    client.println("GET /Arduino/Add?id=magister2018&voltage=240&l1_current=15.35&l2_current=0.00&l3_current=0.17 HTTP/1.1"); 
+    Serial.println("connected");
+    client.println("Host: " + host);
+    client.println("Connection: close");
+    client.println();
+  } 
+  else {
+    Serial.println("connection failed");
+    Serial.println();
+  }
+
+  while(client.connected() && !client.available()) delay(1);
+  while (client.connected() || client.available()) 
+  { 
+    char c = client.read(); 
+    Serial.print(c);
+  }
+
+  Serial.println();
+  Serial.println("disconnecting.");
+  Serial.println("==================");
+  Serial.println();
+  client.stop();
+}
+
 
 void refreshWebServer() {
   EthernetClient ethClient = server.available();
@@ -243,16 +290,6 @@ void refreshWebServer() {
     delay(1);
     ethClient.stop();
   }
-}
-
-void LoadingBars() {
-  screen.setTextColor(WHITE);
-  screen.setTextSize(1);
-  for (int i = 0; i < 40; i++) {
-    screen.print(".");
-    //delay(100);
-  }
-  screen.println();
 }
 
 void LoadUI() {
@@ -319,9 +356,11 @@ void refreshUI() {
   screen.print(watt_L3);
   screen.print(" ");
 }
+
 String DisplayIpAddress(IPAddress ip)
 {
   return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
 }
+
 
 
