@@ -1,4 +1,4 @@
-#include <EmonLib.h>
+  #include <EmonLib.h>
 #include <NTPClient.h>
 #include <SPFD5408_Adafruit_GFX.h>
 #include <SPFD5408_Adafruit_TFTLCD.h>
@@ -173,42 +173,6 @@ void loop() {
   ampere_L3 = (EnergyMonitorL3.calcIrms(1480));
   watt_L3 = ampere_L3 * voltage;
 
-
-  //  //////////////////////////////API//////////////////////////////////////
-  //  EthernetClient ethClient = server.available();
-  //  if (ethClient) {
-  //    bool currentLineIsBlank = true;
-  //    while (ethClient.connected()) {
-  //      if (ethClient.available()) {
-  //        char c = ethClient.read();
-  //        if (c == '\n' && currentLineIsBlank) {
-  //          ethClient.println("HTTP/1.1 200 OK");
-  //          ethClient.println("Content-Type: application/json;charset=utf-8");
-  //          ethClient.println("Connection: close");
-  //          ethClient.println();
-  //          ethClient.print("{\"time\":\"" + timeClient.getFormattedTime() + "\",\"deviceid\":\"" + devID + "\",\"values\":{\"voltage\":\"");
-  //          ethClient.print(voltage);
-  //          ethClient.print("\",\"l1current\":\"");
-  //          ethClient.print(ampere_L1);
-  //          ethClient.print("\",\"l2current\":\"");
-  //          ethClient.print(ampere_L2);
-  //          ethClient.print("\",\"l3current\":\"");
-  //          ethClient.print(ampere_L3);
-  //          ethClient.print("\"}}");
-  //          break;
-  //        }
-  //        if (c == '\n') {
-  //          currentLineIsBlank = true;
-  //        } else if (c != '\r') {
-  //          currentLineIsBlank = false;
-  //        }
-  //      }
-  //    }
-  //  }
-  //
-  //  //delay(1000);
-  //  //////////////////////////////////////////////////////////////////////////
-
   Serial.print(ampere_L1);
   Serial.println(" L1 [A]");
   Serial.print(ampere_L2);
@@ -222,8 +186,6 @@ void loop() {
   refreshUI();
   refreshWebServer();
   post();
-  delay(300);
-
 }
 
 void post()
@@ -231,7 +193,7 @@ void post()
   String PostString = "/Arduino/Add?id=" + devID + "&voltage=" + voltage + "&l1_current=" + ampere_L1 + "&l1_current=" + ampere_L1 + "&l1_current=" + ampere_L1;
    if (client.connect(myserver, 80)) {  
     Serial.println("connected");
-    client.println("GET /Arduino/Add?id=magister2018&voltage=240&l1_current=15.35&l2_current=0.00&l3_current=0.17 HTTP/1.1"); 
+    client.println("GET /Arduino/Add?id=" + devID + "&voltage=" + voltage + "&l1_current=" + ampere_L1 + "&l2_current=" + ampere_L2 + "&l3_current=" + ampere_L3 + " HTTP/1.1"); 
     Serial.println("connected");
     client.println("Host: " + host);
     client.println("Connection: close");
