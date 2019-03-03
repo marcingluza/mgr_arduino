@@ -1,4 +1,4 @@
-  #include <EmonLib.h>
+#include <EmonLib.h>
 #include <NTPClient.h>
 #include <SPFD5408_Adafruit_GFX.h>
 #include <SPFD5408_Adafruit_TFTLCD.h>
@@ -7,7 +7,9 @@
 #include <EthernetUdp.h>
 #include <HttpClient.h>
 
-const String devID = "magister2018";
+const String devName = "magister2018";
+const String devID = "GKO0llTgODKWSdEFmaY3";
+const int loopsLimit = 10;
 
 
 #define LCD_CS A3 // Chip Select goes to Analog 3
@@ -36,6 +38,11 @@ int watt_L3 = 0;
 float ampereSum = 0.0;
 int watts = 0;
 
+float avg_ampere_L1 = 0.0;
+float avg_ampere_L2 = 0.0;
+float avg_ampere_L3 = 0.0;
+int avg_voltage = 0;
+
 EnergyMonitor EnergyMonitorL1;
 EnergyMonitor EnergyMonitorL2;
 EnergyMonitor EnergyMonitorL3;
@@ -46,8 +53,8 @@ EnergyMonitor EnergyMonitorL3;
 
 Adafruit_TFTLCD screen(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
 
-byte myserver[] = { 192, 168, 1, 211 };
-String host = "192.168.1.211";
+byte myserver[] = { 192, 168, 1, 212 };
+String host = "192.168.1.212";
 int serverPort = 64996;
 byte mac[] = {0x00, 0xAA, 0xBB, 0xCC, 0xDE, 0x02};
 EthernetClient client;
@@ -55,7 +62,7 @@ EthernetServer server(9095);
 EthernetUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "0.pl.pool.ntp.org", 7200);
 int connectionAttempts = 1;
-
+int loops = 0;
 
 String localIp;
 
@@ -185,29 +192,50 @@ void loop() {
   watts = ampereSum * voltage;
   refreshUI();
   refreshWebServer();
-  post();
+
+  if (loops == loopsLimit)
+  {
+    avg_ampere_L1 = avg_ampere_L1 / loops;
+    avg_ampere_L2 = avg_ampere_L2 / loops;
+    avg_ampere_L3 = avg_ampere_L3 / loops;
+    avg_voltage = avg_voltage / loops;
+    post();
+    loops = 0;
+    avg_ampere_L1 = 0;
+    avg_ampere_L2 = 0;
+    avg_ampere_L3 = 0;
+    avg_voltage = 0;
+  }
+
+  avg_ampere_L1 += ampere_L1;
+  avg_ampere_L2 += ampere_L2;
+  avg_ampere_L3 += ampere_L3;
+  avg_voltage += voltage;
+
+  loops++;
+  Serial.println(loops);
 }
 
 void post()
 {
-  String PostString = "/Arduino/Add?id=" + devID + "&voltage=" + voltage + "&l1_current=" + ampere_L1 + "&l1_current=" + ampere_L1 + "&l1_current=" + ampere_L1;
-   if (client.connect(myserver, 80)) {  
+  String PostString = "/Arduino/Add?id=" + devID + "&voltage=" + avg_voltage + "&l1_current=" + avg_ampere_L1 + "&l2_current=" + avg_ampere_L2 + "&l3_current=" + avg_ampere_L3;
+  if (client.connect(myserver, 80)) {
     Serial.println("connected");
-    client.println("GET /Arduino/Add?id=" + devID + "&voltage=" + voltage + "&l1_current=" + ampere_L1 + "&l2_current=" + ampere_L2 + "&l3_current=" + ampere_L3 + " HTTP/1.1"); 
+    client.println("GET /Arduino/Add?id=" + devID + "&voltage=" + avg_voltage + "&l1_current=" + avg_ampere_L1 + "&l2_current=" + avg_ampere_L2 + "&l3_current=" + avg_ampere_L3 + " HTTP/1.1");
     Serial.println("connected");
     client.println("Host: " + host);
     client.println("Connection: close");
     client.println();
-  } 
+  }
   else {
     Serial.println("connection failed");
     Serial.println();
   }
 
-  while(client.connected() && !client.available()) delay(1);
-  while (client.connected() || client.available()) 
-  { 
-    char c = client.read(); 
+  while (client.connected() && !client.available()) delay(1);
+  while (client.connected() || client.available())
+  {
+    char c = client.read();
     Serial.print(c);
   }
 
